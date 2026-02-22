@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>MerchSnap — Calendar</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: { 50:'#f0f4ff', 100:'#dce8ff', 500:'#4169e1', 600:'#3457c8', 700:'#2a45a8' }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      background: #e5e7eb;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+    #app {
+      width: 100%;
+      max-width: 390px;
+      height: 100vh;
+      background: #f9fafb;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: 0 0 40px rgba(0,0,0,0.18);
+    }
+    @media (max-width: 390px) {
+      #app { box-shadow: none; }
+      body { background: #f9fafb; }
+    }
+    #cal-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+    #cal-scroll::-webkit-scrollbar { display: none; }
+
+    .store-row { transition: background 0.1s; cursor: pointer; }
+    .store-row:active { background: #f0f4ff; }
+
+    /* ── Photo Sheet (bottom drawer) ── */
+    #sheet-backdrop {
+      position: absolute; inset: 0;
+      background: rgba(0,0,0,0.4);
+      z-index: 30;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.25s;
+    }
+    #sheet-backdrop.show { opacity: 1; pointer-events: all; }
+
+    #photo-sheet {
+      position: absolute; bottom: 0; left: 0; right: 0;
+      background: white;
+      border-radius: 24px 24px 0 0;
+      z-index: 40;
+      max-height: 82%;
+      display: flex; flex-direction: column;
+      transform: translateY(100%);
+      transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+    }
+    #photo-sheet.show { transform: translateY(0); }
+
+    #sheet-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+    #sheet-scroll::-webkit-scrollbar { display: none; }
+
+    .photo-thumb {
+      aspect-ratio: 1;
+      border-radius: 10px;
+      overflow: hidden;
+      background: #e5e7eb;
+      cursor: pointer;
+      transition: opacity 0.12s;
+    }
+    .photo-thumb:active { opacity: 0.8; }
+    .photo-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+    /* ── Lightbox ── */
+    #lightbox {
+      position: absolute; inset: 0;
+      background: rgba(0,0,0,0.95);
+      z-index: 50;
+      display: flex; flex-direction: column;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.2s;
+    }
+    #lightbox.show { opacity: 1; pointer-events: all; }
+
+    #lightbox-img {
+      flex: 1;
+      width: 100%;
+      object-fit: contain;
+      display: block;
+    }
+
+    /* Skeleton loader for images */
+    .img-skeleton {
+      background: linear-gradient(90deg, #e5e7eb 25%, #f3f4f6 50%, #e5e7eb 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.4s infinite;
+    }
+    @keyframes shimmer {
+      0%   { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <!-- Status bar -->
+  <div class="h-10 bg-white flex-shrink-0"></div>
+
+  <!-- Header -->
+  <div class="bg-white flex items-center px-4 pb-3 flex-shrink-0 border-b border-gray-100">
+    <a href="dashboard.html" class="flex items-center justify-center w-9 h-9 rounded-full hover:bg-gray-100 -ml-1 mr-2">
+      <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/>
+      </svg>
+    </a>
+    <div class="flex-1">
+      <h1 class="text-base font-semibold text-gray-800 leading-tight">Activity Calendar</h1>
+      <p class="text-xs text-gray-400">Last 7 days</p>
+    </div>
+    <!-- Summary badge -->
+    <div class="flex flex-col items-end">
+      <span class="text-xs font-bold text-brand-500">34 photos</span>
+      <span class="text-xs text-gray-400">this week</span>
+    </div>
+  </div>
+
+  <!-- Calendar list -->
+  <div id="cal-scroll" class="px-4 pt-4 pb-6 space-y-4">
+    <!-- Rendered by JS -->
+  </div>
+
+  <!-- ── Sheet backdrop ── -->
+  <div id="sheet-backdrop" onclick="closeSheet()"></div>
+
+  <!-- ── Photo Sheet ── -->
+  <div id="photo-sheet">
+    <!-- Drag handle -->
+    <div class="flex justify-center pt-3 pb-1 flex-shrink-0">
+      <div class="w-10 h-1 bg-gray-200 rounded-full"></div>
+    </div>
+
+    <!-- Sheet header -->
+    <div class="flex items-start gap-3 px-5 pt-3 pb-4 border-b border-gray-100 flex-shrink-0">
+      <div id="sheet-avatar"
+           class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 text-white text-xs font-bold"></div>
+      <div class="flex-1 min-w-0">
+        <p id="sheet-store-name" class="text-sm font-bold text-gray-800 leading-tight"></p>
+        <p id="sheet-store-addr" class="text-xs text-gray-400 mt-0.5 truncate"></p>
+        <p id="sheet-store-time" class="text-xs text-brand-500 mt-1 font-medium"></p>
+      </div>
+      <button onclick="closeSheet()"
+        class="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0 -mt-1">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Photo grid -->
+    <div id="sheet-scroll" class="px-4 pt-4 pb-8">
+      <div id="photo-grid" class="grid grid-cols-3 gap-2"></div>
+    </div>
+  </div>
+
+  <!-- ── Lightbox ── -->
+  <div id="lightbox">
+    <!-- Top bar -->
+    <div class="flex items-center justify-between px-4 pt-12 pb-4 flex-shrink-0">
+      <button onclick="closeLightbox()"
+        class="w-9 h-9 rounded-full flex items-center justify-center"
+        style="background: rgba(255,255,255,0.15);">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+      </button>
+      <span id="lightbox-counter" class="text-white text-sm font-medium"></span>
+      <div class="w-9"></div><!-- spacer -->
+    </div>
+
+    <!-- Image -->
+    <div class="flex-1 flex items-center justify-center overflow-hidden">
+      <img id="lightbox-img" src="" alt="Photo" class="w-full h-full object-contain" />
+    </div>
+
+    <!-- Bottom nav -->
+    <div class="flex items-center justify-between px-8 py-8 flex-shrink-0">
+      <button onclick="stepLightbox(-1)" id="lb-prev"
+        class="w-12 h-12 rounded-full flex items-center justify-center"
+        style="background: rgba(255,255,255,0.15);">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/>
+        </svg>
+      </button>
+
+      <!-- Dots indicator -->
+      <div id="lb-dots" class="flex items-center gap-1.5"></div>
+
+      <button onclick="stepLightbox(1)" id="lb-next"
+        class="w-12 h-12 rounded-full flex items-center justify-center"
+        style="background: rgba(255,255,255,0.15);">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  /* ── Data ─────────────────────────────────────────────── */
+  const days = [
+    {
+      label: 'Today',
+      date:  'Sat, 22 Feb 2026',
+      stores: [
+        { id:'s1', name:'Woolworths Metro', address:'123 George St, Sydney NSW 2000', time:'2:34 PM', photos:4, color:'#16a34a' },
+        { id:'s2', name:'Coles',            address:'12 Elizabeth St, Sydney NSW 2000', time:'11:22 AM', photos:2, color:'#dc2626' },
+      ]
+    },
+    {
+      label: 'Yesterday',
+      date:  'Fri, 21 Feb 2026',
+      stores: [
+        { id:'s3', name:'Target',  address:'45 Swanston St, Melbourne VIC 3000', time:'3:15 PM', photos:6, color:'#d97706' },
+        { id:'s4', name:'Big W',   address:'550 George St, Sydney NSW 2000', time:'1:08 PM', photos:3, color:'#1d4ed8' },
+      ]
+    },
+    {
+      label: 'Thu, 20 Feb',
+      date:  'Thu, 20 Feb 2026',
+      stores: [
+        { id:'s5', name:'Woolworths', address:'456 Bourke St, Melbourne VIC 3000', time:'4:45 PM', photos:5, color:'#16a34a' },
+      ]
+    },
+    {
+      label: 'Wed, 19 Feb',
+      date:  'Wed, 19 Feb 2026',
+      stores: [
+        { id:'s6', name:'Coles Central',    address:'288 Bourke St, Melbourne VIC 3000', time:'2:20 PM', photos:8, color:'#dc2626' },
+        { id:'s7', name:'Woolworths Metro', address:'123 George St, Sydney NSW 2000',    time:'10:00 AM', photos:2, color:'#16a34a' },
+      ]
+    },
+    {
+      label: 'Tue, 18 Feb',
+      date:  'Tue, 18 Feb 2026',
+      stores: []
+    },
+    {
+      label: 'Mon, 17 Feb',
+      date:  'Mon, 17 Feb 2026',
+      stores: [
+        { id:'s8', name:'Target', address:'45 Swanston St, Melbourne VIC 3000', time:'9:30 AM', photos:4, color:'#d97706' },
+      ]
+    },
+    {
+      label: 'Sun, 16 Feb',
+      date:  'Sun, 16 Feb 2026',
+      stores: [
+        { id:'s9',  name:'Big W', address:'550 George St, Sydney NSW 2000',       time:'2:00 PM', photos:7, color:'#1d4ed8' },
+        { id:'s10', name:'Coles', address:'12 Elizabeth St, Sydney NSW 2000', time:'11:45 AM', photos:3, color:'#dc2626' },
+      ]
+    },
+  ];
+
+  /* ── Render calendar ──────────────────────────────────── */
+  function initials(name) {
+    return name.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase();
+  }
+
+  const calScroll = document.getElementById('cal-scroll');
+
+  days.forEach(day => {
+    // Day section
+    const section = document.createElement('div');
+
+    // Header row
+    const header = document.createElement('div');
+    header.className = 'flex items-center gap-3 mb-2';
+    header.innerHTML = `
+      <span class="text-xs font-bold ${day.label === 'Today' ? 'text-brand-500' : 'text-gray-500'} uppercase tracking-widest">${day.label}</span>
+      <span class="text-xs text-gray-300">${day.date}</span>
+      ${day.stores.length > 0 ? `<span class="ml-auto text-xs text-gray-400">${day.stores.reduce((a,s)=>a+s.photos,0)} photos</span>` : ''}
+    `;
+    section.appendChild(header);
+
+    if (day.stores.length === 0) {
+      // No activity
+      const empty = document.createElement('div');
+      empty.className = 'flex items-center gap-2 bg-white rounded-2xl px-4 py-3 border border-gray-100';
+      empty.innerHTML = `
+        <div class="w-7 h-7 rounded-lg bg-gray-100 flex items-center justify-center">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </div>
+        <p class="text-xs text-gray-400">No store visits</p>`;
+      section.appendChild(empty);
+    } else {
+      const storeList = document.createElement('div');
+      storeList.className = 'space-y-2';
+
+      day.stores.forEach(store => {
+        const row = document.createElement('div');
+        row.className = 'store-row flex items-center gap-3 bg-white rounded-2xl px-4 py-3.5 shadow-sm border border-gray-100';
+        row.onclick = () => openSheet(store);
+        row.innerHTML = `
+          <div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 text-white text-xs font-bold"
+               style="background:${store.color}">${initials(store.name)}</div>
+          <div class="flex-1 min-w-0">
+            <p class="text-sm font-semibold text-gray-800 truncate">${store.name}</p>
+            <p class="text-xs text-gray-400 truncate mt-0.5">${store.address}</p>
+          </div>
+          <div class="flex items-center gap-2 flex-shrink-0">
+            <div class="flex flex-col items-end">
+              <span class="text-xs font-bold text-brand-500">${store.photos}</span>
+              <span class="text-xs text-gray-400">photos</span>
+            </div>
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+            </svg>
+          </div>`;
+        storeList.appendChild(row);
+      });
+
+      section.appendChild(storeList);
+    }
+
+    calScroll.appendChild(section);
+  });
+
+  /* ── Photo Sheet ──────────────────────────────────────── */
+  let currentStore = null;
+
+  function openSheet(store) {
+    currentStore = store;
+
+    // Populate header
+    const avatar = document.getElementById('sheet-avatar');
+    avatar.textContent = initials(store.name);
+    avatar.style.background = store.color;
+    document.getElementById('sheet-store-name').textContent = store.name;
+    document.getElementById('sheet-store-addr').textContent = store.address;
+    document.getElementById('sheet-store-time').textContent = `Visited at ${store.time} · ${store.photos} photos`;
+
+    // Build photo grid
+    const grid = document.getElementById('photo-grid');
+    grid.innerHTML = '';
+    for (let i = 0; i < store.photos; i++) {
+      const wrap = document.createElement('div');
+      wrap.className = 'photo-thumb img-skeleton';
+      const img = document.createElement('img');
+      img.src = `https://picsum.photos/seed/${store.id}p${i}/300/300`;
+      img.alt = `Photo ${i + 1}`;
+      img.loading = 'lazy';
+      img.onload = () => wrap.classList.remove('img-skeleton');
+      img.onclick = () => openLightbox(i);
+      wrap.appendChild(img);
+      grid.appendChild(wrap);
+    }
+
+    // Show
+    document.getElementById('sheet-backdrop').classList.add('show');
+    document.getElementById('photo-sheet').classList.add('show');
+  }
+
+  function closeSheet() {
+    document.getElementById('sheet-backdrop').classList.remove('show');
+    document.getElementById('photo-sheet').classList.remove('show');
+  }
+
+  /* ── Lightbox ─────────────────────────────────────────── */
+  let lbIndex = 0;
+
+  function openLightbox(index) {
+    lbIndex = index;
+    updateLightbox();
+    document.getElementById('lightbox').classList.add('show');
+  }
+
+  function closeLightbox() {
+    document.getElementById('lightbox').classList.remove('show');
+  }
+
+  function stepLightbox(dir) {
+    if (!currentStore) return;
+    lbIndex = Math.max(0, Math.min(currentStore.photos - 1, lbIndex + dir));
+    updateLightbox();
+  }
+
+  function updateLightbox() {
+    if (!currentStore) return;
+    const total = currentStore.photos;
+
+    // Image
+    document.getElementById('lightbox-img').src =
+      `https://picsum.photos/seed/${currentStore.id}p${lbIndex}/390/600`;
+
+    // Counter
+    document.getElementById('lightbox-counter').textContent = `${lbIndex + 1} / ${total}`;
+
+    // Dots
+    const dotsEl = document.getElementById('lb-dots');
+    const maxDots = Math.min(total, 7);
+    dotsEl.innerHTML = Array.from({ length: maxDots }, (_, i) => {
+      const active = i === (maxDots < total ? Math.min(lbIndex, maxDots - 1) : lbIndex);
+      return `<div style="width:${active?'20px':'7px'};height:7px;border-radius:4px;background:${active?'white':'rgba(255,255,255,0.35)'};transition:all 0.2s;"></div>`;
+    }).join('');
+
+    // Prev/Next opacity
+    document.getElementById('lb-prev').style.opacity = lbIndex === 0 ? '0.3' : '1';
+    document.getElementById('lb-next').style.opacity = lbIndex === total - 1 ? '0.3' : '1';
+  }
+
+  // Swipe support for lightbox
+  let touchStartX = 0;
+  document.getElementById('lightbox').addEventListener('touchstart', e => {
+    touchStartX = e.touches[0].clientX;
+  }, { passive: true });
+  document.getElementById('lightbox').addEventListener('touchend', e => {
+    const dx = e.changedTouches[0].clientX - touchStartX;
+    if (Math.abs(dx) > 50) stepLightbox(dx < 0 ? 1 : -1);
+  }, { passive: true });
+</script>
+</body>
+</html>

@@ -1,378 +1,492 @@
-# Technical Requirements: Merchandise Condition Photo Upload App
+# MerchSnap — UI Requirements Document
+### Based on HTML POC · v1.0
+
+---
 
 ## 1. Overview
 
-A cross-platform mobile application enabling company staff to document the current condition of merchandise in stores by capturing and uploading geotagged, timestamped photos. Staff self-register via the app and must be approved by an Application Owner or Admin before gaining access. The system includes a mobile client and a backend API with secure data storage.
+**MerchSnap** is a mobile-first web application (targeting React Native in production) that enables field staff to document the condition of merchandise in stores by capturing and uploading geotagged, timestamped photos. This document reflects the functional and visual requirements as defined by the HTML proof-of-concept (POC).
 
------
+---
 
-## 2. Goals & Objectives
+## 2. App Identity
 
-- Allow staff to self-register using their Google account and await account approval.
-- Allow Application Owners and Admins to activate or deactivate staff accounts.
-- Allow any active staff member to select or add a store and upload photos of merchandise.
-- Capture geolocation data at the time of photo capture.
-- Timestamp all photos on both the client and server side.
-- Provide a backend API to store and associate submissions with the correct Store and Staff member.
+| Property      | Value                              |
+|---------------|------------------------------------|
+| App Name      | MerchSnap                          |
+| Tagline       | Merchandise condition documentation |
+| Primary Color | `#4169e1` (Royal Blue)             |
+| Font Stack    | `-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif` |
+| Viewport      | Mobile-first, 390px canonical width |
 
------
+---
 
-## 3. Stakeholders
+## 3. User Roles & Account States
 
-|Role             |Responsibility                                           |
-|-----------------|---------------------------------------------------------|
-|Field Staff      |Self-register, add stores, capture and upload photos     |
-|Application Owner|Approve, activate, and deactivate staff accounts         |
-|Admin            |Full system management — users, stores, and configuration|
-|IT / DevOps      |Maintain infrastructure and deployment                   |
+### 3.1 Roles
 
------
+| Role                | Description                                                        |
+|---------------------|--------------------------------------------------------------------|
+| Field Staff         | Self-registers, captures and uploads photos, browses stores        |
+| Application Owner   | Approves, activates, and deactivates staff accounts                |
+| Admin               | Full system access including store edits and owner management      |
 
-## 4. Mobile Application Requirements
-
-### 4.1 Platform Support
-
-- **iOS**: iOS 15 and above
-- **Android**: Android 10 (API Level 29) and above
-- **Framework**: React Native (Expo managed workflow)
-
-### 4.2 Registration Flow
-
-- Staff register via the app using Google SSO (OAuth 2.0) using their personal Gmail account (`@gmail.com`)
-- On first login with an unrecognised Google account, the app creates a pending registration
-- Staff are shown a “Your account is awaiting approval” screen and cannot access app features until approved
-- Staff are notified (push notification or email) when their account is approved or deactivated
-- Re-registration with the same Google account is not permitted — a deactivated account must be reactivated by an Application Owner or Admin
-- There is **no email domain restriction**; access control is enforced entirely through the approval workflow
-
-### 4.3 Authentication
-
-- Google SSO via OAuth 2.0
-- Any valid Google/Gmail account may attempt registration — there is no domain restriction
-- Access is controlled exclusively by account status (`pending`, `active`, `deactivated`), not by email domain
-- JWT issued by the backend only if the account status is **active**; pending and deactivated accounts receive a clear error response with their current status
-- Tokens stored securely using device keychain/keystore
-- Session expiry with silent refresh; user prompted to re-authenticate when token cannot be refreshed
-- If a session is active but the account is deactivated mid-session, the next API call returns a 403 and the app logs the user out with an explanatory message
-
-### 4.4 Store Selection & Addition
-
-- Any active staff member can upload to any store — no store assignment restrictions
-- Staff must select a store before uploading photos
-- Store list retrieved from the API (not hardcoded)
-- Stores are identified by a system-generated UUID — store names are not unique
-- Each store displays its full address alongside the name to help staff distinguish between stores with the same name
-- Staff can search and filter stores by name or address
-- Staff can optionally filter stores by proximity using device location
-- **Staff can add a new store** if it does not already exist — they must provide store name and full address; the new store is immediately available for selection by all staff
-- Selected store persisted during the session
-
-### 4.5 Photo Capture & Upload
-
-- Staff can capture photos using the native device camera or select from the gallery
-- No limit on the number of photos per submission
-- Each photo must capture:
-  - **Timestamp**: ISO 8601 format, recorded at time of capture (device local time + UTC offset)
-  - **Geolocation**: Latitude, longitude, and accuracy radius captured at time of photo
-  - **Store ID**: As selected by the staff member
-  - **Staff ID**: Derived from the authenticated session
-- Photos should be compressed before upload to reduce bandwidth (target: max 1–2 MB per image)
-- Support batch upload of multiple photos per session
-- Upload progress indicator shown to the user
-- Retry mechanism for failed uploads (with offline queue)
-
-### 4.6 Offline Support
-
-- Photos taken without connectivity are queued locally
-- Upload occurs automatically when connectivity is restored
-- User notified of pending uploads
-
-### 4.7 Permissions Required
-
-- Camera
-- Photo Library / Media Storage
-- Location (Fine Location — required at time of capture)
-- Internet Access
-- Push Notifications (for account approval/deactivation alerts)
-
------
-
-## 5. Account Management Requirements
-
-### 5.1 Overview
-
-Account management is available **directly within the mobile app** for both Application Owners and Admins. There is no separate admin web interface required for this functionality in v1. Application Owners and Admins log in with the same Google SSO flow as staff but are presented with an additional **Account Management** section in the app based on their role.
-
-### 5.2 Application Owner Capabilities (In-App)
-
-- View list of all staff accounts with their current status: **Pending**, **Active**, or **Deactivated**
-- Approve (activate) a pending staff registration
-- Deactivate an active staff account
-- Reactivate a deactivated staff account
-- View basic staff profile: name, email, registration date, last active date
-- Cannot manage other Application Owner or Admin accounts
-
-### 5.3 Admin Capabilities (In-App)
-
-- All Application Owner capabilities above
-- Manage Application Owner accounts (activate, deactivate, reactivate)
-- View full audit log of account status changes
-- Update store records
-- Assign or change user roles (staff ↔ application_owner)
-
-### 5.4 Account Status Lifecycle
+### 3.2 Account Status Lifecycle
 
 ```
-[New Registration] → PENDING → (Approved by Application Owner/Admin) → ACTIVE
-                                                              ↕
-                                              (Deactivated by Application Owner/Admin) → DEACTIVATED
-                                              (Reactivated by Application Owner/Admin) → ACTIVE
+[Google Sign-In] → PENDING → (Approved) → ACTIVE
+                                               ↕
+                               (Deactivated) → DEACTIVATED → (Reactivated) → ACTIVE
 ```
 
-### 5.5 Business Rules
+| Status      | App Access                                               |
+|-------------|----------------------------------------------------------|
+| Pending     | Awaiting Approval screen only; no features accessible    |
+| Active      | Full access to Dashboard, Store Selection, Photo Capture, Calendar |
+| Deactivated | Blocked; shown an error on sign-in                       |
 
-- A staff member with **Pending** or **Deactivated** status cannot log in or use the app
-- Application Owners can only manage accounts at the staff role level — they cannot create or modify other Application Owner or Admin accounts
-- Admins have full account management access across all roles
-- Account status changes must be logged with a timestamp and the actor who made the change
+---
 
------
-
-## 6. Backend API Requirements
-
-### 6.1 Technology Stack (Recommended)
-
-- **Runtime**: Node.js (Express or Fastify)
-- **Database**: PostgreSQL (relational data) + DigitalOcean Spaces (photo storage)
-- **Authentication**: Google OAuth 2.0 token verification + JWT issuance
-- **Hosting**: DigitalOcean App Platform
-
-### 6.2 Authentication & Registration Endpoints
-
-|Method|Endpoint       |Description                                                                                                                                                                              |
-|------|---------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-|POST  |`/auth/google` |Accepts Google ID token; if new account, creates a pending registration and returns `account_pending` status; if active, returns JWT; if deactivated, returns `account_deactivated` error|
-|POST  |`/auth/refresh`|Accepts refresh token, returns new access token (only for active accounts)                                                                                                               |
-|POST  |`/auth/logout` |Invalidates refresh token                                                                                                                                                                |
-
-### 6.3 User / Account Management Endpoints
-
-|Method|Endpoint           |Description                                                                       |
-|------|-------------------|----------------------------------------------------------------------------------|
-|GET   |`/users`           |Application Owner/Admin only — returns paginated list of staff with account status|
-|GET   |`/users/:id`       |Application Owner/Admin only — returns staff profile and status                   |
-|PATCH |`/users/:id/status`|Application Owner/Admin only — sets account status to `active` or `deactivated`   |
-|GET   |`/users/me`        |Returns the authenticated staff member’s own profile                              |
-
-### 6.4 Store Endpoints
-
-|Method|Endpoint     |Description                                                                       |
-|------|-------------|----------------------------------------------------------------------------------|
-|GET   |`/stores`    |Any active staff — returns full list of stores; supports search by name or address|
-|GET   |`/stores/:id`|Any active staff — returns store details including full address                   |
-|POST  |`/stores`    |Any active staff — creates a new store record with name and address               |
-|PUT   |`/stores/:id`|Admin only — updates store details                                                |
-
-### 6.5 Submission & Photo Endpoints
-
-|Method|Endpoint                 |Description                                                                                  |
-|------|-------------------------|---------------------------------------------------------------------------------------------|
-|POST  |`/submissions`           |Creates a new submission record (store + staff + metadata)                                   |
-|POST  |`/submissions/:id/photos`|Uploads one or more photos to an existing submission; no limit on photo count                |
-|GET   |`/submissions`           |Returns paginated list of submissions; staff see their own; application owners/admins see all|
-|GET   |`/submissions/:id`       |Returns a specific submission with photo metadata                                            |
-
-### 6.6 Photo Metadata Captured by API
-
-Each photo record must store:
-
-|Field              |Type    |Description                                |
-|-------------------|--------|-------------------------------------------|
-|`photo_id`         |UUID    |Unique identifier                          |
-|`submission_id`    |UUID    |Parent submission                          |
-|`staff_id`         |UUID    |Uploader identity                          |
-|`store_id`         |UUID    |Selected store                             |
-|`file_url`         |String  |Secure pre-signed URL to stored file       |
-|`client_timestamp` |DateTime|Timestamp from the device at capture       |
-|`server_timestamp` |DateTime|Timestamp recorded by the server on receipt|
-|`latitude`         |Decimal |GPS latitude at time of capture            |
-|`longitude`        |Decimal |GPS longitude at time of capture           |
-|`location_accuracy`|Decimal |GPS accuracy in metres                     |
-|`mime_type`        |String  |e.g., `image/jpeg`                         |
-|`file_size_bytes`  |Integer |File size in bytes                         |
-
------
-
-## 7. Data Model (Simplified)
+## 4. Navigation & User Flow
 
 ```
-Staff
-  - staff_id (PK, UUID)
-  - name
-  - email                   -- Google account email, unique
-  - role                    -- enum: staff | application_owner | admin
-  - account_status          -- enum: pending | active | deactivated
-  - registered_at
-  - last_active_at
-  - approved_by (FK → Staff, nullable)
-  - approved_at (nullable)
-
-AccountStatusLog
-  - log_id (PK, UUID)
-  - staff_id (FK → Staff)   -- account being changed
-  - changed_by (FK → Staff) -- application owner/admin who made the change
-  - from_status
-  - to_status
-  - changed_at
-
-Store
-  - store_id (PK, UUID)
-  - name                    -- not unique; same name may exist across locations
-  - address_line_1
-  - address_line_2 (optional)
-  - city
-  - state_province
-  - postcode
-  - country
-  - latitude                -- derived/geocoded from address
-  - longitude               -- derived/geocoded from address
-  - created_by (FK → Staff)
-  - created_at
-
-Submission
-  - submission_id (PK, UUID)
-  - staff_id (FK → Staff)
-  - store_id (FK → Store)
-  - created_at
-
-Photo
-  - photo_id (PK, UUID)
-  - submission_id (FK → Submission)
-  - file_url
-  - client_timestamp
-  - server_timestamp
-  - latitude
-  - longitude
-  - location_accuracy
-  - file_size_bytes
-  - mime_type
+Login
+  ├── [New / Pending user]  → Awaiting Approval → (loop until approved)
+  └── [Active user]         → Dashboard
+                                  ├── Take Photo  → Photo Capture & Upload
+                                  ├── Stores      → Store Selection
+                                  │                     ├── [Select store] → Photo Capture & Upload
+                                  │                     └── Add Store      → Store Selection
+                                  └── Calendar    → Activity Calendar
+                                                        └── [Tap store]   → Photo Sheet
+                                                                └── [Tap photo] → Lightbox
 ```
 
------
+---
 
-## 8. Security Requirements
+## 5. Screen Requirements
 
-- All API communication over HTTPS (TLS 1.2+)
-- Google ID tokens validated against Google’s public keys (not trusted blindly)
-- JWTs signed with RS256; access token expiry: 15 minutes; refresh token expiry: 7 days
-- No email domain restriction on Google SSO — any Gmail account may register; access is gated entirely by the Application Owner/Admin approval workflow
-- Account status checked on every authenticated request — deactivated accounts receive 403 immediately
-- Photo URLs must be pre-signed / time-limited (not publicly accessible)
-- Role-based access control (RBAC):
-  - **Staff**: upload to any store, add stores, view own submissions
-  - **Application Owner**: all of the above + approve/activate/deactivate staff accounts
-  - **Admin**: full access including store updates and application owner account management
-- All account status changes are audit-logged with actor and timestamp
-- All PII and location data stored in compliance with applicable privacy regulations (e.g., Privacy Act if in AU)
+---
 
------
+### 5.1 Login
 
-## 9. Non-Functional Requirements
+**File:** `login.html`
 
-|Requirement                      |Target                                                             |
-|---------------------------------|-------------------------------------------------------------------|
-|Photo upload response time       |< 5 seconds per photo under normal 4G conditions                   |
-|API availability                 |99.5% uptime                                                       |
-|Max photo size (post-compression)|2 MB                                                               |
-|Photos per submission            |No limit                                                           |
-|Supported concurrent users       |500 (initial)                                                      |
-|Photo storage retention          |Configurable; default 12 months                                    |
-|Audit logging                    |All upload, authentication, and account status change events logged|
+#### Layout
+- Full-screen blue accent header (brand gradient) with:
+  - Camera icon in a white rounded square
+  - App name **MerchSnap** and tagline
+- Card body below the header containing:
+  - "Welcome back" heading and descriptive copy
+  - Horizontal divider labelled **Sign in**
+  - Google Sign-In button
+  - Info callout explaining the approval requirement
+  - Footer with Terms of Service and Privacy Policy text links
 
------
+#### Behaviour
+| Element               | Behaviour                                               |
+|-----------------------|---------------------------------------------------------|
+| Google Sign-In button | Scales to 0.97 on press (active state); navigates to `awaiting-approval.html` (mocked — no real OAuth in POC) |
+| Info callout          | Static; informs user that new accounts require approval |
 
-## 10. Out of Scope (Initial Release)
+#### Copy
+- Button label: **Continue with Google**
+- Info note: *"New accounts require approval before accessing the app. You'll be notified once your account is activated."*
 
-- Application Owner / Admin review portal for viewing photo submissions (planned as a separate web-based application)
-- Account management is **in scope** for the mobile app — the separate portal covers submission review only
-- In-app photo annotation or editing
-- Real-time notifications beyond account approval/deactivation alerts
-- AI-based photo analysis (e.g., shelf condition detection)
-- Integration with inventory management systems
-- Store assignment or restriction by staff role
+---
 
------
+### 5.2 Awaiting Approval
 
-## 11. Assumptions & Dependencies
+**File:** `awaiting-approval.html`
 
-- Staff use personal Gmail accounts (`@gmail.com`) for authentication — the company does not provide corporate Google Workspace accounts to field staff
-- The first Admin account is provisioned manually by IT during initial setup (no self-service admin registration)
-- Store names are not unique — the full address is the definitive disambiguator; UUID is the primary key for all store references
-- Staff devices have GPS and camera hardware
-- Network connectivity (3G/4G/Wi-Fi) is generally available at store locations, but offline queuing handles intermittent connectivity
-- Cloud infrastructure provider is DigitalOcean
+#### Layout
+- Top bar with **Sign out** link (left) and **MerchSnap** wordmark (right)
+- Centred content:
+  - Three concentric pulsing rings (blue, animated)
+  - Clock icon in a filled blue circle at the centre
+  - Heading: **Account pending approval**
+  - Descriptive paragraph
+  - 3-step progress tracker (vertical)
+- Amber notification callout (bottom)
+- **Sign out** button (bottom)
 
------
+#### 3-Step Progress Tracker
 
-## 12. Suggested Technology Stack Summary
+| Step | Label                    | State            | Visual                    |
+|------|--------------------------|------------------|---------------------------|
+| 1    | Google sign-in complete  | Done             | Blue filled, checkmark    |
+| 2    | Awaiting approval        | Active (current) | Amber filled, dot         |
+| 3    | Access granted           | Pending          | Grey filled, number "3"   |
 
-|Layer         |Technology                                           |
-|--------------|-----------------------------------------------------|
-|Mobile App    |React Native (Expo managed workflow)                 |
-|Authentication|Google OAuth 2.0 + JWT                               |
-|Backend API   |Node.js + Express / Fastify                          |
-|Database      |PostgreSQL (DigitalOcean Managed PostgreSQL)         |
-|File Storage  |DigitalOcean Spaces (S3-compatible object storage)   |
-|Hosting       |DigitalOcean App Platform                            |
-|CI/CD         |GitHub Actions                                       |
-|Monitoring    |DigitalOcean Monitoring + Papertrail (log management)|
+#### Animations
+- Three rings pulse with a `scale(1.12)` animation at 2.4s duration with staggered delays (0s, 0.8s, 1.6s)
 
------
+#### Navigation
+| Element              | Destination     |
+|----------------------|-----------------|
+| Sign out (top)       | `login.html`    |
+| Sign out (bottom)    | `login.html`    |
 
-## 13. Estimated Monthly Infrastructure Cost (DigitalOcean)
+---
 
-> **Note:** Prices are based on current DigitalOcean published rates as of early 2026. Actual costs may vary with usage. Two scenarios are provided — a lean **Starter** setup for early-stage / low user volume, and a **Growth** setup for a more established user base with higher photo upload volumes.
+### 5.3 Dashboard
 
-### Scenario A — Starter (up to ~50 active staff, low upload volume)
+**File:** `dashboard.html`
 
-|Service          |DigitalOcean Product            |Spec                                     |Monthly Cost       |
-|-----------------|--------------------------------|-----------------------------------------|-------------------|
-|API Backend      |App Platform (Basic, shared CPU)|1 container, 512 MB RAM                  |~$5.00             |
-|Database         |Managed PostgreSQL (Single Node)|1 GB RAM, 10 GB SSD                      |~$15.00            |
-|Photo Storage    |Spaces (Object Storage)         |250 GiB storage + 1 TiB transfer included|$5.00              |
-|Log Management   |Papertrail (via DO Marketplace) |Developer plan (50 MB/day)               |~$7.00             |
-|Bandwidth overage|App Platform egress             |Minimal at low volume                    |~$0–2.00           |
-|**Total**        |                                |                                         |**~$32–34 / month**|
+#### Layout
+- **Header** (blue gradient `#4169e1 → #3457c8`):
+  - Greeting: *"Good day 👋"*, User name (e.g. **Russell**), Role badge (**Field Staff**)
+  - Avatar: circular, initials (e.g. **RS**)
+  - Two stat chips: **Stores today** and **Photos uploaded**
+- **Quick Actions** section:
+  - Full-width primary tile — **Take Photo** (blue gradient, camera icon, subtitle shows last visited store)
+  - Two-column row: **Stores** (green icon tile) | **Calendar** (violet icon tile)
+- **Recent Visits** section:
+  - List of last 3 store visits (coloured avatar, store name, relative timestamp, photo count badge, chevron)
+  - **View full history →** link row at bottom
 
-### Scenario B — Growth (up to ~500 active staff, moderate upload volume)
+#### Mock Data (POC)
+| Field         | Value                  |
+|---------------|------------------------|
+| User name     | Russell                |
+| Role          | Field Staff            |
+| Avatar        | RS                     |
+| Stores today  | 2                      |
+| Photos today  | 6                      |
 
-|Service          |DigitalOcean Product                      |Spec                                          |Monthly Cost       |
-|-----------------|------------------------------------------|----------------------------------------------|-------------------|
-|API Backend      |App Platform (Professional, dedicated CPU)|1 container, 1 vCPU / 2 GB RAM                |~$25.00            |
-|Database         |Managed PostgreSQL (Single Node)          |2 GB RAM, 25 GB SSD                           |~$30.00            |
-|Photo Storage    |Spaces (Object Storage)                   |250 GiB base + ~500 GiB additional @ $0.02/GiB|~$15.00            |
-|Log Management   |Papertrail                                |Fixa plan (1 GB/day logs)                     |~$18.00            |
-|Bandwidth overage|App Platform egress                       |Moderate upload/download traffic              |~$5–10.00          |
-|**Total**        |                                          |                                              |**~$93–98 / month**|
+#### Recent Visits (mock)
+| Store            | Time              | Photos |
+|------------------|-------------------|--------|
+| Woolworths Metro | Today · 2:34 PM   | 4      |
+| Coles            | Today · 11:22 AM  | 2      |
+| Target           | Yesterday · 3:15 PM | 6    |
 
-### Key Pricing Notes
+#### Navigation
+| Element               | Destination                                                                 |
+|-----------------------|-----------------------------------------------------------------------------|
+| Take Photo tile       | `photo-capture.html?name=Woolworths+Metro&address=123+George+St…`           |
+| Stores tile           | `store-selection.html`                                                      |
+| Calendar tile         | `calendar.html`                                                             |
+| Recent visit rows     | `calendar.html`                                                             |
+| View full history     | `calendar.html`                                                             |
 
-- **Spaces base plan** ($5/month) includes 250 GiB storage and 1 TiB outbound transfer — sufficient for low volume. Additional storage is $0.02/GiB and additional transfer is $0.01/GiB.
-- **Photo storage growth** is the most variable cost driver. If 100 staff each upload 10 photos/day at ~1.5 MB each, that’s ~45 GB/month of new data. After 12 months, total storage could reach ~540 GB, pushing Spaces costs to ~$15–20/month.
-- **Managed PostgreSQL single node** does not include a standby (failover) node. For production with higher reliability requirements, add a standby node (doubles the DB cost).
-- **App Platform Professional** tier is recommended for production — shared CPU (Basic) plans can be throttled under sustained load.
-- **Papertrail** is a third-party log management tool available via the DigitalOcean Marketplace. An alternative is DigitalOcean’s native monitoring (included free) for basic metrics, with Papertrail added only if centralised log search is needed.
-- All prices are in **USD**. DigitalOcean bills monthly with no lock-in contracts.
+#### Behaviour
+- Action tiles scale to 0.97 on press
+- Visit rows highlight on press
+- Main content area is independently scrollable
 
-### Cost Scaling Guidance
+---
 
-|Monthly Active Staff          |Estimated Monthly Cost|
-|------------------------------|----------------------|
-|Up to 50                      |~$32–40               |
-|Up to 200                     |~$55–70               |
-|Up to 500                     |~$90–110              |
-|500+ (with HA DB + auto-scale)|~$150–200+            |
+### 5.4 Store Selection
 
------
+**File:** `store-selection.html`
 
-*Version 0.6 — Draft for Review*
+#### Layout
+- Header with back button, title **Select a Store**, subtitle
+- Search bar (magnifying glass icon, clear × button)
+- Filter pills row: **All Stores** | **Near Me** · Dynamic store count (right-aligned)
+- Scrollable store list:
+  - Each row: coloured initial avatar, store name (bold), full address, optional distance badge, chevron
+- Empty state: icon + *"No stores found"* + hint to add store
+- FAB (bottom right): **+ Add Store** (blue pill button)
+
+#### Search Behaviour
+- Filters list in real-time as user types (name and address)
+- Matching text is highlighted with a blue `<mark>` style
+- Clear button (×) appears when input is non-empty
+- Empty state shown when no stores match
+
+#### Near Me Filter
+- Toggles the active pill (blue → grey / grey → blue)
+- Re-sorts list by ascending distance (km)
+- Distance badge appears on each row when active
+
+#### Store List (mock data — 7 stores)
+
+| Store Name       | Address                              | Distance | Colour  |
+|------------------|--------------------------------------|----------|---------|
+| Woolworths Metro | 123 George St, Sydney NSW 2000       | 0.3 km   | Green   |
+| Coles            | 12 Elizabeth St, Sydney NSW 2000     | 0.5 km   | Red     |
+| Woolworths       | 456 Bourke St, Melbourne VIC 3000    | 1.2 km   | Green   |
+| Target           | 45 Swanston St, Melbourne VIC 3000   | 1.8 km   | Amber   |
+| Woolworths       | 789 Queen St, Brisbane QLD 4000      | 2.1 km   | Green   |
+| Coles Central    | 288 Bourke St, Melbourne VIC 3000    | 3.4 km   | Red     |
+| Big W            | 550 George St, Sydney NSW 2000       | 4.1 km   | Blue    |
+
+#### Navigation
+| Element          | Destination                                            |
+|------------------|--------------------------------------------------------|
+| Back button      | `dashboard.html`                                       |
+| Store row tap    | `photo-capture.html?name={name}&address={address}`    |
+| Add Store FAB    | `add-store.html`                                       |
+
+---
+
+### 5.5 Add New Store
+
+**File:** `add-store.html`
+
+#### Layout
+- Header with back button, title **Add New Store**, subtitle
+- Scrollable form:
+  - Store Name *(required)*
+  - Address Line 1 *(required)*
+  - Address Line 2 *(optional)*
+  - City / Suburb *(required, half-width)*
+  - State *(required, half-width)*
+  - Postcode *(required, half-width, numeric keyboard)*
+  - Country *(required, half-width)*
+  - Blue info callout: *"This store will be immediately available for all staff…"*
+- Sticky bottom **Add Store** button
+
+#### Form Validation
+- All required fields validated on submit
+- Fields with errors: red border + inline error message below
+- Errors clear individually as user types in each field
+- Page auto-scrolls to first errored field on submit
+
+#### Success State
+- Full-screen white overlay fades in (0.3s)
+- Green animated checkmark (pop scale animation)
+- **Store Added!** heading
+- Confirmation of store name and address
+- **Back to Store List** button
+
+#### Navigation
+| Element                   | Destination          |
+|---------------------------|----------------------|
+| Back button               | `store-selection.html` |
+| Back to Store List button | `store-selection.html` |
+
+---
+
+### 5.6 Photo Capture & Upload
+
+**File:** `photo-capture.html`
+
+#### Layout
+- Header: back button, **Upload Photos** title
+- **Store banner**: store icon, store name and address, **Change** link
+- **Geo/Timestamp strip**: live GPS coordinates (left) | live clock HH:MM:SS (right)
+- **Content area** (toggles between two states):
+  - **Empty state** (no photos): dashed camera icon box, heading, Take Photo button, Choose from Gallery button
+  - **Photo grid** (photos selected): 3-column grid of thumbnails with × remove button on each, Camera + Gallery row buttons below
+- **Bottom bar** (visible when photos selected): **Upload {n} Photos** button
+
+#### Upload Overlay (triggered on upload)
+- **Progress state**: upload icon, *"Uploading…"* heading, per-photo progress bar (0–100%), percentage counter
+- **Success state**: animated green checkmark, *"Upload Complete!"*, confirmation text, **Upload More Photos** + **Change Store** buttons
+
+#### Real Behaviours in POC
+| Feature              | Implementation                                                        |
+|----------------------|-----------------------------------------------------------------------|
+| Camera input         | `<input type="file" accept="image/*" capture="environment">`         |
+| Gallery input        | `<input type="file" accept="image/*" multiple>`                      |
+| Photo preview        | FileReader API → `readAsDataURL()` → rendered in grid                |
+| Remove photo         | Splices from array, re-renders grid                                   |
+| Geolocation          | `navigator.geolocation.getCurrentPosition()` with fallback to `–33.8688, 151.2093` (Sydney) |
+| Live clock           | `setInterval` every 1000ms updating time label                       |
+| Upload simulation    | Per-photo progress animation using `requestAnimationFrame` + easeOut timing, ~1.2s per photo |
+| Store name/address   | Read from URL query parameters (`?name=…&address=…`)                 |
+
+#### Navigation
+| Element                | Destination            |
+|------------------------|------------------------|
+| Back button            | `store-selection.html` |
+| Change link            | `store-selection.html` |
+| Upload More Photos     | Resets screen (clears photos) |
+| Change Store           | `store-selection.html` |
+
+---
+
+### 5.7 Activity Calendar
+
+**File:** `calendar.html`
+
+#### Layout
+- Header: back button, **Activity Calendar** title, **34 photos this week** summary badge
+- Scrollable 7-day list:
+  - Each day: date label (Today / Yesterday / Day, DD Mon), full date, total photo count
+  - Days with no visits: grey empty-state row (*"No store visits"*)
+  - Days with visits: list of store rows
+
+#### Store Row (within each day)
+- Coloured initial avatar, store name, full address, visit time, photo count (bold + "photos" label), chevron
+- Tapping opens the **Photo Sheet**
+
+#### Photo Sheet (bottom drawer)
+- Slides up from bottom (cubic-bezier animation), semi-transparent backdrop
+- Drag handle at top
+- Store header: avatar, name, address, *"Visited at {time} · {n} photos"*
+- Close (×) button
+- 3-column photo grid with:
+  - Lazy-loaded images (picsum.photos placeholder in POC)
+  - Skeleton shimmer loader while loading
+  - Tap to open **Lightbox**
+
+#### Lightbox (full-screen photo viewer)
+- Dark overlay (`rgba(0,0,0,0.95)`)
+- Top bar: close (×) button (left), **{n} / {total}** counter (centre)
+- Full-size image (`object-fit: contain`)
+- Bottom bar: Previous (←) button, dot indicator (up to 7 dots, active dot wider), Next (→) button
+- Boundary states: prev/next buttons dim to 0.3 opacity at first/last photo
+- Swipe support: touch delta > 50px triggers navigation
+
+#### Mock Data — 7 Days
+
+| Day              | Stores Visited                                    | Photos |
+|------------------|---------------------------------------------------|--------|
+| Today (22 Feb)   | Woolworths Metro (4), Coles (2)                   | 6      |
+| Yesterday (21 Feb) | Target (6), Big W (3)                           | 9      |
+| Thu 20 Feb       | Woolworths Melbourne (5)                          | 5      |
+| Wed 19 Feb       | Coles Central (8), Woolworths Metro (2)           | 10     |
+| Tue 18 Feb       | *(no visits)*                                     | 0      |
+| Mon 17 Feb       | Target (4)                                        | 4      |
+| Sun 16 Feb       | Big W (7), Coles (3)                              | 10     |
+| **Week total**   |                                                   | **34** |
+
+#### Navigation
+| Element               | Destination           |
+|-----------------------|-----------------------|
+| Back button           | `dashboard.html`      |
+| Store row tap         | Opens Photo Sheet     |
+| Backdrop tap          | Closes Photo Sheet    |
+| Photo thumbnail tap   | Opens Lightbox        |
+| Lightbox close (×)    | Closes Lightbox       |
+
+---
+
+## 6. Design System
+
+### 6.1 Colour Palette
+
+| Token          | Hex       | Usage                                      |
+|----------------|-----------|--------------------------------------------|
+| Brand 500      | `#4169e1` | Primary buttons, headers, active states    |
+| Brand 600      | `#3457c8` | Gradient end, darker accents               |
+| Brand 50       | `#f0f4ff` | Active nav backgrounds, info tints         |
+| Brand 100      | `#dce8ff` | Highlight marks, light accents             |
+| Green 600      | `#16a34a` | Woolworths avatar, Stores tile             |
+| Red 600        | `#dc2626` | Coles avatar, error states                 |
+| Amber 600      | `#d97706` | Target avatar, active step (approval)      |
+| Blue 700       | `#1d4ed8` | Big W avatar                               |
+| Violet 600     | `#7c3aed` | Calendar tile                              |
+| Gray 100       | `#f3f4f6` | Input backgrounds, nav item backgrounds    |
+| Gray 200       | `#e5e7eb` | Borders, dividers, skeleton base           |
+| Gray 400       | `#9ca3af` | Placeholder text, secondary labels         |
+| Gray 500       | `#6b7280` | Body text, subtitles                       |
+| Gray 800       | `#1f2937` | Primary body text                          |
+
+### 6.2 Typography
+
+| Size   | Tailwind  | Usage                               |
+|--------|-----------|-------------------------------------|
+| 10px   | `text-xs` (tracking-widest) | Section labels (uppercase) |
+| 12px   | `text-xs` | Secondary labels, badges, captions  |
+| 13px   | `text-sm` | Nav descriptions, body copy         |
+| 14px   | `text-sm` (font-medium/semibold) | Buttons, form labels |
+| 16px   | `text-base`| Tile labels, form inputs           |
+| 20px   | `text-xl` | Dashboard heading, screen titles    |
+| 24px   | `text-2xl`| Login heading, approval heading     |
+
+### 6.3 Border Radius
+
+| Token     | Tailwind       | Usage                                   |
+|-----------|----------------|-----------------------------------------|
+| Large     | `rounded-2xl`  | Cards, store rows, form inputs, badges  |
+| Extra large | `rounded-3xl` | Action tiles, primary buttons          |
+| Full      | `rounded-full` | Pills, FAB, avatar circles             |
+
+### 6.4 Interactive States
+
+| State  | Behaviour                                 |
+|--------|-------------------------------------------|
+| Active | `transform: scale(0.95–0.97)` on press    |
+| Hover  | Background lightens (`hover:bg-gray-50`)  |
+| Focus  | Blue border + `box-shadow` ring on inputs |
+| Error  | Red border (`#ef4444`) + inline message   |
+
+### 6.5 Phone Shell (POC Navigator only)
+- Dark body (`#1c1c1e`), border-radius `52px`, multi-layer box-shadow
+- Dynamic Island (pill, `118×34px`) at top centre
+- Side buttons: silent toggle, volume up/down (left), power (right)
+- Home indicator bar (bottom centre)
+- Scales to fit viewport height via JS `transform: scale()`
+
+---
+
+## 7. Shared Patterns
+
+### 7.1 Phone Shell (standalone pages)
+- `max-width: 390px`, `height: 100vh`, `overflow: hidden`
+- Centred on desktop with `box-shadow` for phone effect
+- Shadow removed on actual mobile (`≤390px` breakpoint)
+
+### 7.2 Status Bar Spacer
+- All screens include a `h-10` spacer at the top to simulate the iOS/Android status bar
+
+### 7.3 Scrollable Content
+- Scrollable areas use `flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch`
+- Scrollbars hidden via `::-webkit-scrollbar { display: none }`
+
+### 7.4 Empty States
+- Consistent pattern: icon in rounded container + heading + supporting text
+- Used in: Store Selection (no search results), Photo Capture (no photos selected), Calendar (no visits on a day)
+
+### 7.5 Overlays
+- Bottom sheet: `position: absolute`, `transform: translateY(100%)` → `translateY(0)`, cubic-bezier timing
+- Lightbox / success overlays: `opacity: 0; pointer-events: none` → `opacity: 1; pointer-events: all`, 0.2–0.3s transition
+
+---
+
+## 8. File Structure
+
+```
+merchandise-app-ui-poc/
+├── docs/
+│   └── technical-requirements.md   ← this document
+└── mock/  (or root — see current structure)
+    ├── index.html                   ← POC screen navigator (not part of the app)
+    ├── login.html                   ← Screen 1
+    ├── awaiting-approval.html       ← Screen 2
+    ├── dashboard.html               ← Screen 3
+    ├── store-selection.html         ← Screen 4
+    ├── add-store.html               ← Screen 5
+    ├── photo-capture.html           ← Screen 6
+    └── calendar.html                ← Screen 7
+```
+
+---
+
+## 9. POC Scope & Limitations
+
+The following are mocked or simplified in the HTML POC and will require real implementation:
+
+| Feature                    | POC Behaviour                               | Production Requirement               |
+|----------------------------|---------------------------------------------|---------------------------------------|
+| Google Sign-In             | Button navigates directly (no OAuth)        | Google OAuth 2.0 via Expo Auth Session |
+| Account approval           | Static screen (no polling)                  | Push notification / real-time status check |
+| Store list                 | Hardcoded array of 7 stores                 | API: `GET /stores`                    |
+| Near Me distance           | Hardcoded distance values                   | Geolocation API + server-side distance sort |
+| Add Store                  | Success overlay only (no persistence)       | API: `POST /stores`                   |
+| Photo upload               | Simulated progress bar (~1.2s per photo)    | Multipart upload to `POST /submissions/:id/photos` |
+| Geolocation                | `getCurrentPosition()` with Sydney fallback | Required; fail gracefully              |
+| Calendar photos            | picsum.photos placeholder images            | Pre-signed URLs from DigitalOcean Spaces |
+| Calendar history           | Hardcoded 7-day dataset                     | API: `GET /submissions?staff_id=me`   |
+| User profile               | Hardcoded "Russell / Field Staff"           | JWT claims from authenticated session  |
+| Account management screens | Not built in POC                            | In-app for Application Owner / Admin  |
+
+---
+
+## 10. Out of Scope (v1 POC)
+
+- Account management screens (Application Owner / Admin role)
+- Push notification delivery
+- Offline photo queue
+- Real authentication and session management
+- Backend API and database
+- Admin/Owner web portal for submission review
+
+---
+
+*Document generated from HTML POC review · MerchSnap v1.0 POC · February 2026*
