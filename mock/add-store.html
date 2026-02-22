@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>MerchSnap — Add Store</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: { 50:'#f0f4ff', 100:'#dce8ff', 500:'#4169e1', 600:'#3457c8', 700:'#2a45a8' }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      background: #e5e7eb;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+    #app {
+      width: 100%;
+      max-width: 390px;
+      height: 100vh;
+      background: #f9fafb;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: 0 0 40px rgba(0,0,0,0.18);
+    }
+    @media (max-width: 390px) {
+      #app { box-shadow: none; }
+      body { background: #f9fafb; }
+    }
+    #form-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+    #form-scroll::-webkit-scrollbar { display: none; }
+    input:focus { outline: none; border-color: #4169e1; box-shadow: 0 0 0 3px rgba(65,105,225,0.12); }
+    input.error { border-color: #ef4444; }
+    .field-label { display: block; font-size: 0.75rem; font-weight: 600; color: #6b7280; margin-bottom: 0.375rem; text-transform: uppercase; letter-spacing: 0.05em; }
+    .field-input { display: block; width: 100%; background: white; border: 1.5px solid #e5e7eb; border-radius: 0.875rem; padding: 0.75rem 1rem; font-size: 0.875rem; color: #1f2937; transition: border-color 0.15s, box-shadow 0.15s; }
+    .field-input::placeholder { color: #9ca3af; }
+    .error-msg { display: none; font-size: 0.7rem; color: #ef4444; margin-top: 0.3rem; }
+    /* Success overlay */
+    #success-overlay {
+      position: absolute; inset: 0; background: white;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      z-index: 50; opacity: 0; pointer-events: none; transition: opacity 0.3s;
+    }
+    #success-overlay.show { opacity: 1; pointer-events: all; }
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <!-- Status bar spacer -->
+  <div class="h-10 bg-white flex-shrink-0"></div>
+
+  <!-- Top nav -->
+  <div class="bg-white flex items-center px-4 pb-3 flex-shrink-0 border-b border-gray-100">
+    <a href="store-selection.html" class="flex items-center justify-center w-9 h-9 rounded-full hover:bg-gray-100 -ml-1 mr-2">
+      <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/>
+      </svg>
+    </a>
+    <div class="flex-1">
+      <h1 class="text-base font-semibold text-gray-800 leading-tight">Add New Store</h1>
+      <p class="text-xs text-gray-400">Fill in the store details below</p>
+    </div>
+  </div>
+
+  <!-- Scrollable form -->
+  <div id="form-scroll">
+    <form id="store-form" novalidate class="px-4 pt-4 pb-32 space-y-4">
+
+      <!-- Store Name -->
+      <div>
+        <label class="field-label">Store Name <span class="text-red-400">*</span></label>
+        <input id="f-name" type="text" class="field-input" placeholder="e.g. Woolworths Metro" />
+        <p class="error-msg" id="err-name">Store name is required.</p>
+      </div>
+
+      <!-- Address Line 1 -->
+      <div>
+        <label class="field-label">Address Line 1 <span class="text-red-400">*</span></label>
+        <input id="f-addr1" type="text" class="field-input" placeholder="e.g. 123 George St" />
+        <p class="error-msg" id="err-addr1">Address is required.</p>
+      </div>
+
+      <!-- Address Line 2 -->
+      <div>
+        <label class="field-label">Address Line 2 <span class="text-gray-300 normal-case font-normal">(optional)</span></label>
+        <input id="f-addr2" type="text" class="field-input" placeholder="Suite, floor, unit…" />
+      </div>
+
+      <!-- City / Suburb -->
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="field-label">City / Suburb <span class="text-red-400">*</span></label>
+          <input id="f-city" type="text" class="field-input" placeholder="e.g. Sydney" />
+          <p class="error-msg" id="err-city">City is required.</p>
+        </div>
+        <div>
+          <label class="field-label">State <span class="text-red-400">*</span></label>
+          <input id="f-state" type="text" class="field-input" placeholder="e.g. NSW" />
+          <p class="error-msg" id="err-state">State is required.</p>
+        </div>
+      </div>
+
+      <!-- Postcode / Country -->
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="field-label">Postcode <span class="text-red-400">*</span></label>
+          <input id="f-postcode" type="text" inputmode="numeric" class="field-input" placeholder="e.g. 2000" />
+          <p class="error-msg" id="err-postcode">Postcode is required.</p>
+        </div>
+        <div>
+          <label class="field-label">Country <span class="text-red-400">*</span></label>
+          <input id="f-country" type="text" class="field-input" placeholder="e.g. Australia" />
+          <p class="error-msg" id="err-country">Country is required.</p>
+        </div>
+      </div>
+
+      <!-- Info note -->
+      <div class="flex items-start gap-2 bg-blue-50 rounded-2xl p-4 mt-2">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-brand-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 100 20A10 10 0 0012 2z"/>
+        </svg>
+        <p class="text-xs text-blue-700 leading-relaxed">
+          This store will be immediately available for all staff to upload to. Please double-check the address before saving.
+        </p>
+      </div>
+
+    </form>
+  </div>
+
+  <!-- Sticky bottom submit -->
+  <div class="absolute bottom-0 left-0 right-0 bg-white border-t border-gray-100 px-4 py-4 pb-8">
+    <button type="button" id="submit-btn"
+      onclick="submitForm()"
+      class="w-full bg-brand-500 text-white font-semibold text-sm py-4 rounded-2xl shadow active:scale-95 transition-transform">
+      Add Store
+    </button>
+  </div>
+
+  <!-- Success overlay -->
+  <div id="success-overlay">
+    <div class="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mb-5">
+      <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+      </svg>
+    </div>
+    <h2 class="text-xl font-bold text-gray-800 mb-2">Store Added!</h2>
+    <p id="success-name" class="text-sm text-gray-500 mb-8 text-center px-8"></p>
+    <a href="store-selection.html"
+       class="bg-brand-500 text-white text-sm font-semibold px-8 py-3.5 rounded-2xl shadow">
+      Back to Store List
+    </a>
+  </div>
+
+</div>
+
+<script>
+  const required = [
+    { id: 'f-name',     err: 'err-name',     msg: 'Store name is required.' },
+    { id: 'f-addr1',    err: 'err-addr1',    msg: 'Address is required.' },
+    { id: 'f-city',     err: 'err-city',     msg: 'City is required.' },
+    { id: 'f-state',    err: 'err-state',    msg: 'State is required.' },
+    { id: 'f-postcode', err: 'err-postcode', msg: 'Postcode is required.' },
+    { id: 'f-country',  err: 'err-country',  msg: 'Country is required.' },
+  ];
+
+  // Clear error on input
+  required.forEach(({ id, err }) => {
+    document.getElementById(id).addEventListener('input', () => {
+      document.getElementById(id).classList.remove('error');
+      document.getElementById(err).style.display = 'none';
+    });
+  });
+
+  function submitForm() {
+    let valid = true;
+
+    required.forEach(({ id, err }) => {
+      const el  = document.getElementById(id);
+      const errEl = document.getElementById(err);
+      if (!el.value.trim()) {
+        el.classList.add('error');
+        errEl.style.display = 'block';
+        valid = false;
+      }
+    });
+
+    if (!valid) {
+      // Scroll to first error
+      const firstErr = document.querySelector('.field-input.error');
+      if (firstErr) firstErr.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+
+    // Show success
+    const name    = document.getElementById('f-name').value.trim();
+    const addr1   = document.getElementById('f-addr1').value.trim();
+    const city    = document.getElementById('f-city').value.trim();
+    const state   = document.getElementById('f-state').value.trim();
+    const postcode = document.getElementById('f-postcode').value.trim();
+    const country  = document.getElementById('f-country').value.trim();
+
+    document.getElementById('success-name').textContent =
+      `"${name}" at ${addr1}, ${city} ${state} ${postcode}, ${country}`;
+
+    const overlay = document.getElementById('success-overlay');
+    overlay.classList.add('show');
+  }
+</script>
+</body>
+</html>
