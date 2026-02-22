@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>MerchSnap — Sign In</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50:  '#f0f4ff',
+              100: '#dce8ff',
+              500: '#4169e1',
+              600: '#3457c8',
+              700: '#2a45a8',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* Simulate a phone shell when viewed on desktop */
+    body {
+      background: #e5e7eb;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+    #app {
+      width: 100%;
+      max-width: 390px;
+      min-height: 100vh;
+      background: #ffffff;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: 0 0 40px rgba(0,0,0,0.18);
+    }
+    @media (max-width: 390px) {
+      #app { box-shadow: none; }
+      body  { background: #fff; }
+    }
+    .google-btn:active {
+      transform: scale(0.97);
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+
+    <!-- Top accent blob -->
+    <div class="absolute top-0 left-0 right-0 h-72 bg-brand-500 rounded-b-[60px] z-0"></div>
+
+    <!-- Status bar spacer -->
+    <div class="h-10 relative z-10"></div>
+
+    <!-- Hero section -->
+    <div class="relative z-10 flex flex-col items-center px-8 pt-10 pb-6">
+      <!-- App icon -->
+      <div class="w-20 h-20 bg-white rounded-3xl flex items-center justify-center shadow-lg mb-4">
+        <!-- Camera icon -->
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10 text-brand-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+          <path stroke-linecap="round" stroke-linejoin="round"
+            d="M3 9.75A2.25 2.25 0 015.25 7.5h.878a1.5 1.5 0 001.342-.83L8.25 5.25h7.5l.78 1.42A1.5 1.5 0 0017.872 7.5h.878A2.25 2.25 0 0121 9.75v8.25A2.25 2.25 0 0118.75 20.25H5.25A2.25 2.25 0 013 18V9.75z" />
+          <circle cx="12" cy="13.5" r="3" stroke="currentColor" stroke-width="1.8" fill="none"/>
+        </svg>
+      </div>
+      <h1 class="text-2xl font-bold text-white tracking-tight">MerchSnap</h1>
+      <p class="text-blue-100 text-sm mt-1 text-center">Merchandise condition documentation</p>
+    </div>
+
+    <!-- Card body -->
+    <div class="relative z-10 flex-1 flex flex-col justify-between px-6 pt-8 pb-10">
+
+      <!-- Welcome text -->
+      <div>
+        <h2 class="text-2xl font-semibold text-gray-800 leading-snug">
+          Welcome back
+        </h2>
+        <p class="text-gray-500 text-sm mt-2 leading-relaxed">
+          Sign in with your Google account to document store merchandise conditions.
+        </p>
+
+        <!-- Divider -->
+        <div class="flex items-center gap-3 my-8">
+          <div class="flex-1 h-px bg-gray-200"></div>
+          <span class="text-xs text-gray-400 uppercase tracking-widest">Sign in</span>
+          <div class="flex-1 h-px bg-gray-200"></div>
+        </div>
+
+        <!-- Google Sign-In Button -->
+        <a href="awaiting-approval.html"
+           class="google-btn flex items-center justify-center gap-3 w-full border border-gray-200 rounded-2xl py-4 px-4 shadow-sm bg-white hover:bg-gray-50 transition-colors duration-150 cursor-pointer">
+          <!-- Google "G" logo -->
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 flex-shrink-0" viewBox="0 0 48 48">
+            <path fill="#EA4335" d="M24 9.5c3.14 0 5.95 1.08 8.17 2.84l6.08-6.08C34.42 3.05 29.52 1 24 1 14.82 1 7.07 6.48 3.87 14.18l7.12 5.53C12.72 13.31 17.93 9.5 24 9.5z"/>
+            <path fill="#4285F4" d="M46.52 24.5c0-1.64-.15-3.22-.42-4.75H24v9h12.67c-.55 2.96-2.2 5.46-4.67 7.13l7.16 5.56C43.07 37.13 46.52 31.3 46.52 24.5z"/>
+            <path fill="#FBBC05" d="M10.99 28.29A14.6 14.6 0 019.5 24c0-1.49.26-2.93.72-4.29L3.1 14.18A23.93 23.93 0 001 24c0 3.86.92 7.5 2.87 10.64l7.12-6.35z"/>
+            <path fill="#34A853" d="M24 47c5.52 0 10.15-1.83 13.53-4.97l-7.16-5.56C28.6 38.01 26.43 38.5 24 38.5c-6.07 0-11.28-3.81-13.01-9.21l-7.12 6.35C7.07 43.52 14.82 47 24 47z"/>
+          </svg>
+          <span class="text-gray-700 font-medium text-sm">Continue with Google</span>
+        </a>
+
+        <!-- Info note -->
+        <div class="flex items-start gap-2 mt-6 bg-blue-50 rounded-2xl p-4">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-brand-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 100 20A10 10 0 0012 2z"/>
+          </svg>
+          <p class="text-xs text-blue-700 leading-relaxed">
+            New accounts require approval before accessing the app. You'll be notified once your account is activated.
+          </p>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <p class="text-center text-xs text-gray-400 mt-10">
+        By signing in you agree to our
+        <span class="text-brand-500">Terms of Service</span>
+        and
+        <span class="text-brand-500">Privacy Policy</span>.
+      </p>
+
+    </div>
+  </div>
+</body>
+</html>
